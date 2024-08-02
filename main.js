@@ -31,7 +31,7 @@ document.body.appendChild(renderer.domElement);
 // フィールドの追加
 const fieldLoader = new GLTFLoader();
 let field;
-fieldLoader.load('assets/soccer_field/scene.gltf', (gltf) => {
+fieldLoader.load('/assets/soccer_field/scene.gltf', (gltf) => {
   field = gltf.scene;
   scene.add(field);
 });
@@ -39,7 +39,7 @@ fieldLoader.load('assets/soccer_field/scene.gltf', (gltf) => {
 // ボールの設定
 const ballLoader = new GLTFLoader();
 let ball;
-ballLoader.load('assets/soccer_ball/scene.gltf', (gltf) => {
+ballLoader.load('/assets/soccer_ball/scene.gltf', (gltf) => {
   ball = gltf.scene;
   ball.scale.set(0.3, 0.3, 0.3);
   scene.add(ball);
@@ -71,8 +71,8 @@ async function loadPlayerTeam(url) {
 
 async function init() {
   // 左チームと右チームの選手モデルをロード
-  leftTeamPlayers = await loadPlayerTeam('assets/player_blue/player_blue.gltf');
-  rightTeamPlayers = await loadPlayerTeam('assets/player_red/player_red.gltf');
+  leftTeamPlayers = await loadPlayerTeam('/assets/player_blue/player_blue.gltf');
+  rightTeamPlayers = await loadPlayerTeam('/assets/player_red/player_red.gltf');
 
   // 初期位置を設定
   setInitialPlayerPositions();
