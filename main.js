@@ -9,12 +9,20 @@ const loadingScreen = document.getElementById('loading-screen');
 
 // ローディングマネージャーの作成
 const loadingManager = new THREE.LoadingManager();
+let isLoaded = false;
+let initialPositionsSet = false;
+
+function checkLoadingComplete() {
+  if (isLoaded && initialPositionsSet) {
+    loadingScreen.classList.add('hidden');
+  }
+}
 
 // モデルの読み込みを管理する関数
 function setupLoadingManager() {
   loadingManager.onLoad = () => {
     // 全てのモデルが読み込まれたときの処理
-    loadingScreen.classList.add('hidden');
+    isLoaded = true;
   };
 
   loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
@@ -102,9 +110,10 @@ async function init() {
 
   // 初期位置を設定
   setInitialPlayerPositions();
+  checkLoadingComplete();
 }
 
-init().catch(console.error);
+
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; // アニメーションをスムーズにする
@@ -211,6 +220,8 @@ function setInitialPlayerPositions() {
     const rightPlayer = rightTeamPlayers[index];
     rightPlayer.position.set(x, 0, z);
   });
+
+  initialPositionsSet = true;
 }
 
 function updatePlayerPositions(leftTeamPositions, rightTeamPositions) {
@@ -280,6 +291,6 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-setInitialPlayerPositions();
+init().catch(console.error);
 animate();
 
