@@ -4,6 +4,32 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import positionData from './position.json';
 import * as TWEEN from '@tweenjs/tween.js'
 
+// ローディング画面を取得
+const loadingScreen = document.getElementById('loading-screen');
+
+// ローディングマネージャーの作成
+const loadingManager = new THREE.LoadingManager();
+
+// モデルの読み込みを管理する関数
+function setupLoadingManager() {
+  loadingManager.onLoad = () => {
+    // 全てのモデルが読み込まれたときの処理
+    loadingScreen.classList.add('hidden');
+  };
+
+  loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+    // モデルの読み込み進行状況を表示する処理
+    console.log(`Loading ${url}: ${itemsLoaded} / ${itemsTotal}`);
+  };
+
+  loadingManager.onError = (url) => {
+    // モデルの読み込みエラー処理
+    console.error(`Error loading ${url}`);
+  };
+}
+
+setupLoadingManager();
+
 // シーン、カメラ、レンダラーの設定
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -29,7 +55,7 @@ renderer.gammaOutput = true;
 document.body.appendChild(renderer.domElement);
 
 // フィールドの追加
-const fieldLoader = new GLTFLoader();
+const fieldLoader = new GLTFLoader(loadingManager);
 let field;
 fieldLoader.load('/assets/soccer_field/scene.gltf', (gltf) => {
   field = gltf.scene;
@@ -37,7 +63,7 @@ fieldLoader.load('/assets/soccer_field/scene.gltf', (gltf) => {
 });
 
 // ボールの設定
-const ballLoader = new GLTFLoader();
+const ballLoader = new GLTFLoader(loadingManager);
 let ball;
 ballLoader.load('/assets/soccer_ball/scene.gltf', (gltf) => {
   ball = gltf.scene;
@@ -52,7 +78,7 @@ let rightTeamPlayers = [];
 
 async function loadPlayerModel(url) {
   return new Promise((resolve, reject) => {
-    const loader = new GLTFLoader();
+    const loader = new GLTFLoader(loadingManager);
     loader.load(url, (gltf) => {
       resolve(gltf.scene);
     }, undefined, reject);
@@ -97,8 +123,14 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 's') { // Press 's' to start the race
     startGame = true;
     pauseGame = false;
+    startFrameMgr();
   } else if (event.key === 'p') { // Press 'p' to pause/resume the race
     pauseGame = !pauseGame;
+    if (pauseGame) {
+      stopFrameMgr();
+    } else {
+      startFrameMgr();
+    }
   } else if (event.key === 'c') { // Press 'c' to set camera position
     camera.position.set(0, 70, 0);
     camera.lookAt(new THREE.Vector3(0, 0, 0));
@@ -249,6 +281,5 @@ function animate() {
 }
 
 setInitialPlayerPositions();
-startFrameMgr();
 animate();
 
