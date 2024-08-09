@@ -2,41 +2,6 @@ import * as THREE from 'three';
 import { GLTFLoader } from './node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import positionData from './position.json';
-import * as TWEEN from '@tweenjs/tween.js'
-
-// ローディング画面を取得
-const loadingScreen = document.getElementById('loading-screen');
-
-// ローディングマネージャーの作成
-const loadingManager = new THREE.LoadingManager();
-let isLoaded = false;
-let initialPositionsSet = false;
-
-function checkLoadingComplete() {
-  if (isLoaded && initialPositionsSet) {
-    loadingScreen.classList.add('hidden');
-  }
-}
-
-// モデルの読み込みを管理する関数
-function setupLoadingManager() {
-  loadingManager.onLoad = () => {
-    // 全てのモデルが読み込まれたときの処理
-    isLoaded = true;
-  };
-
-  loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
-    // モデルの読み込み進行状況を表示する処理
-    console.log(`Loading ${url}: ${itemsLoaded} / ${itemsTotal}`);
-  };
-
-  loadingManager.onError = (url) => {
-    // モデルの読み込みエラー処理
-    console.error(`Error loading ${url}`);
-  };
-}
-
-setupLoadingManager();
 
 // シーン、カメラ、レンダラーの設定
 const scene = new THREE.Scene();
@@ -47,9 +12,9 @@ camera.lookAt(new THREE.Vector3(0, 0, 0));
 const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // Adjust color and intensity as needed
 scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); // 平行光源
-directionalLight.position.set(5, 10, 5).normalize();
-scene.add(directionalLight);
+const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1.0);
+directionalLight1.position.set(5, 10, 5).normalize();
+scene.add(directionalLight1);
 
 const directionalLight2 = new THREE.DirectionalLight(0xffffff, 1.0);
 directionalLight2.position.set(-5, 10, -5).normalize();
@@ -62,108 +27,158 @@ renderer.physicallyCorrectLights = true;
 renderer.gammaOutput = true;
 document.body.appendChild(renderer.domElement);
 
-// フィールドの追加
-const fieldLoader = new GLTFLoader(loadingManager);
-let field;
-fieldLoader.load('/assets/soccer_field/scene.gltf', (gltf) => {
-  field = gltf.scene;
-  scene.add(field);
-});
+// カメラ制御
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.enableZoom = true;
+controls.zoomSpeed = 3.0;
+controls.enablePan = true;
+controls.panSpeed = 1.0;
+controls.minDistance = 10;
+controls.maxDistance = 200;
+controls.maxPolarAngle = Math.PI / 2;
 
-// ボールの設定
-const ballLoader = new GLTFLoader(loadingManager);
-let ball;
-ballLoader.load('/assets/soccer_ball/scene.gltf', (gltf) => {
-  ball = gltf.scene;
-  ball.scale.set(0.3, 0.3, 0.3);
-  scene.add(ball);
-});
+// ローディング関連
+const loadingScreen = document.getElementById('loading-screen');
+let isLoaded = false;
+let initialPositionsSet = false;
 
-// 選手モデルの読み込み関数を非同期化
+function checkLoadingComplete() {
+  if (isLoaded && initialPositionsSet) {
+    loadingScreen.classList.add('hidden');
+  }
+}
+
+const loadingManager = new THREE.LoadingManager();
+setupLoadingManager(loadingManager);
+
+function setupLoadingManager(manager) {
+  manager.onLoad = () => { isLoaded = true; checkLoadingComplete(); };
+  manager.onProgress = (url, itemsLoaded, itemsTotal) => {
+    console.log(`Loading ${url}: ${itemsLoaded} / ${itemsTotal}`);
+  };
+  manager.onError = (url) => { console.error(`Error loading ${url}`); };
+}
+
+// モデル読み込み
+let field, ball;
 const numberOfPlayers = 11;
 let leftTeamPlayers = [];
 let rightTeamPlayers = [];
 
-async function loadPlayerModel(url) {
+async function init() {
+  field = await loadModel('/assets/soccer_field/scene.gltf');
+  ball = await loadBall('/assets/soccer_ball/scene.gltf');
+
+  leftTeamPlayers = await loadTeam('/assets/player_blue/player_blue.gltf');
+  rightTeamPlayers = await loadTeam('/assets/player_red/player_red.gltf');
+
+  setInitialPlayerPositions();
+  checkLoadingComplete();
+}
+
+function loadModel(url) {
   return new Promise((resolve, reject) => {
     const loader = new GLTFLoader(loadingManager);
     loader.load(url, (gltf) => {
+      scene.add(gltf.scene);
       resolve(gltf.scene);
     }, undefined, reject);
   });
 }
 
-async function loadPlayerTeam(url) {
+async function loadTeam(url) {
   const players = [];
   for (let i = 0; i < numberOfPlayers; i++) {
-    const player = await loadPlayerModel(url);
+    const player = await loadModel(url);
     players.push(player);
-    scene.add(player);
   }
   return players;
 }
 
-async function init() {
-  // 左チームと右チームの選手モデルをロード
-  leftTeamPlayers = await loadPlayerTeam('/assets/player_blue/player_blue.gltf');
-  rightTeamPlayers = await loadPlayerTeam('/assets/player_red/player_red.gltf');
-
-  // 初期位置を設定
-  setInitialPlayerPositions();
-  checkLoadingComplete();
+async function loadBall(url) {
+  const ballModel = await loadModel(url);
+  ballModel.scale.set(0.3, 0.3, 0.3);
+  return ballModel;
 }
 
-
-
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; // アニメーションをスムーズにする
-controls.dampingFactor = 0.05; // 減衰係数 (0.25から少し小さくしてみる)
-controls.enableZoom = true; // ズーム機能を有効にする
-controls.zoomSpeed = 3.0; // ズーム速度
-controls.enablePan = true; // パン機能を有効にする
-controls.panSpeed = 1.0; // パン速度
-controls.minDistance = 10; // ズームの最小距離を設定
-controls.maxDistance = 200; // ズームの最大距離を設定
-controls.maxPolarAngle = Math.PI / 2; // カメラの垂直回転の制限
-
+// カメラ制御
 let isBallView = false;
 
-document.addEventListener('keydown', (event) => {
-  if (event.key === 's') { // Press 's' to start the race
-    startGame = true;
-    pauseGame = false;
-    startFrameMgr();
-  } else if (event.key === 'p') { // Press 'p' to pause/resume the race
-    pauseGame = !pauseGame;
-    if (pauseGame) {
-      stopFrameMgr();
-    } else {
-      startFrameMgr();
+function setupCameraControls() {
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'c') {
+      resetCameraPosition();
+    } else if (event.key === 'l') {
+      setCameraPosition(new THREE.Vector3(70, 15, 0));
+    } else if (event.key === 'r') {
+      setCameraPosition(new THREE.Vector3(-70, 15, 0));
+    } else if (event.key === 'b') {
+      isBallView = !isBallView;
     }
-  } else if (event.key === 'c') { // Press 'c' to set camera position
-    camera.position.set(0, 70, 0);
-    camera.lookAt(new THREE.Vector3(0, 0, 0));
-  } else if (event.key === 'l') {
-    camera.position.set(70, 15, 0);
-    camera.lookAt(new THREE.Vector3(0, 0, 0));
-  } else if (event.key === 'r') {
-    camera.position.set(-70, 15, 0);
-    camera.lookAt(new THREE.Vector3(0, 0, 0));
-  } else if (event.key === 'b') {
-    isBallView = !isBallView;
-  }
-});
+  });
+}
 
+function resetCameraPosition() {
+  camera.position.set(0, 70, 0);
+  camera.lookAt(new THREE.Vector3(0, 0, 0));
+}
+
+function setCameraPosition(position) {
+  camera.position.copy(position);
+  camera.lookAt(new THREE.Vector3(0, 0, 0));
+}
+
+// アニメーション処理
 let startGame = false;
 let pauseGame = false;
 const totalFrames = positionData.game_log.length;
-
 let currentFrame = 0;
 const gameDuration = 60 * 1000;
 const frameInterval = gameDuration / totalFrames;
 let timer = null;
+let prevBallPosition = null;
 
-// フレーム管理のスタート関数
+// 再生/一時停止の管理
+const playPauseButton = document.getElementById('play-pause-button');
+const playIcon = playPauseButton.querySelector('#play-icon');
+const pauseIcon = playPauseButton.querySelector('#pause-icon');
+playPauseButton.addEventListener('click', () => {
+  if (!startGame) {
+    startGame = true;
+    pauseGame = false;
+    playIcon.classList.remove('show');
+    pauseIcon.classList.add('show');
+    startFrameMgr();
+  } else {
+    startGame = false;
+    pauseGame = true;
+    playIcon.classList.add('show');
+    pauseIcon.classList.remove('show');
+    stopFrameMgr();
+  }
+});
+
+// シークバーの管理
+const seekBar = document.getElementById('seek-bar');
+seekBar.max = totalFrames - 1;
+
+seekBar.addEventListener('input', (event) => {
+  const frame = parseInt(event.target.value);
+  jumpToFrame(frame);
+});
+
+function updateSeekBar() {
+  seekBar.value = currentFrame;
+}
+function jumpToFrame(frame) {
+  if (frame < 0 || frame >= totalFrames) return;
+  currentFrame = frame;
+  const frameData = positionData.game_log[frame];
+  updatePlayerPositions(frameData.left, frameData.right);
+  updateBallPosition(frameData.ball);
+}
 function startFrameMgr() {
   timer = setInterval(() => {
     nextFrame();
@@ -173,54 +188,19 @@ function startFrameMgr() {
   }, frameInterval);
 }
 
-// 次のフレームに進む関数
+function stopFrameMgr() {
+  clearInterval(timer);
+}
+
 function nextFrame() {
   currentFrame++;
+  updateSeekBar();
 }
 
-let prevBallPosition = null;
-
-function calculateBallSpeed(currentPosition, previousPosition) {
-  if (!previousPosition) return 0;
-
-  const dx = currentPosition[0] - previousPosition[0];
-  const dz = currentPosition[1] - previousPosition[1];
-  return Math.sqrt(dx * dx + dz * dz);
-}
-
-function calculateBallDirection(currentPosition, previousPosition) {
-  if (!previousPosition) return new THREE.Vector3(0, 0, 1);
-
-  const dx = currentPosition[0] - previousPosition[0];
-  const dz = currentPosition[1] - previousPosition[1];
-  const direction = new THREE.Vector3(dx, 0, dz).normalize();
-  return direction;
-}
-
-// アニメーション前に選手の初期位置を設定する関数
 function setInitialPlayerPositions() {
   if (positionData.game_log.length === 0) return;
   const initialFrame = positionData.game_log[0];
-  const { left: leftTeamPositions, right: rightTeamPositions } = initialFrame;
-  // 左チームの選手の位置を設定
-  leftTeamPositions.forEach((playerData, index) => {
-    if (index >= leftTeamPlayers.length) {
-      return;
-    }
-    const [id, , x, z] = playerData;
-    const leftPlayer = leftTeamPlayers[index];
-    leftPlayer.position.set(x, 0, z);
-  });
-
-  // 右チームの選手の位置を設定
-  rightTeamPositions.forEach((playerData, index) => {
-    if (index >= rightTeamPlayers.length) return;
-
-    const [id, , x, z] = playerData;
-    const rightPlayer = rightTeamPlayers[index];
-    rightPlayer.position.set(x, 0, z);
-  });
-
+  updatePlayerPositions(initialFrame.left, initialFrame.right);
   initialPositionsSet = true;
 }
 
@@ -228,62 +208,26 @@ function updatePlayerPositions(leftTeamPositions, rightTeamPositions) {
   if (leftTeamPlayers.length === 0 || rightTeamPlayers.length === 0) return;
 
   leftTeamPositions.forEach((playerData, index) => {
-    if (index >= leftTeamPlayers.length) return;
-
-    const [id, , x, z] = playerData;
-    const leftPlayer = leftTeamPlayers[index];
-    leftPlayer.position.set(x, 0, z);
+    if (index < leftTeamPlayers.length) {
+      leftTeamPlayers[index].position.set(playerData[2], 0, playerData[3]);
+    }
   });
 
   rightTeamPositions.forEach((playerData, index) => {
-    if (index >= rightTeamPlayers.length) return;
-
-    const [id, , x, z] = playerData;
-    const rightPlayer = rightTeamPlayers[index];
-    rightPlayer.position.set(x, 0, z);
+    if (index < rightTeamPlayers.length) {
+      rightTeamPlayers[index].position.set(playerData[2], 0, playerData[3]);
+    }
   });
 }
 
-// アニメーション関数
+
 function animate() {
   requestAnimationFrame(animate);
 
   if (startGame && !pauseGame) {
     if (currentFrame < totalFrames) {
-      console.log(currentFrame, totalFrames);
-
-      if (positionData.game_log) {
-
-      }
-      const { left: leftTeamPositions, right: rightTeamPositions } = positionData.game_log[currentFrame];
-      updatePlayerPositions(leftTeamPositions, rightTeamPositions);
-
-      if (ball) {
-        const { ball: ballPosition } = positionData.game_log[currentFrame];
-        ball.position.set(parseFloat(ballPosition[0]), 0.5, parseFloat(ballPosition[1]));
-  
-        if (prevBallPosition) {
-          // Calculate speed and direction
-          const speed = calculateBallSpeed(ballPosition, prevBallPosition);
-          const direction = calculateBallDirection(ballPosition, prevBallPosition);
-  
-          // Update the ball's rotation to match direction
-          const angle = Math.atan2(direction.z, direction.x); // Calculate angle based on direction
-          ball.rotation.y = angle;
-  
-          // Calculate rotation speed based on ball speed
-          const rotationSpeed = speed * 50;
-          ball.rotation.z += rotationSpeed * (frameInterval / 1000);
-        }
-        prevBallPosition = ballPosition;
-
-        // Update camera position and direction based on the view mode
-        let cameraOffset = new THREE.Vector3(0, 20, 30);
-        if (isBallView) {
-          camera.position.copy(ball.position).add(cameraOffset);
-          camera.lookAt(ball.position);
-        }
-      }
+      updatePlayerPositions(positionData.game_log[currentFrame].left, positionData.game_log[currentFrame].right);
+      updateBallPosition(positionData.game_log[currentFrame].ball);
     }
   }
 
@@ -291,6 +235,44 @@ function animate() {
   renderer.render(scene, camera);
 }
 
+function updateBallPosition(ballPosition) {
+  if (ball) {
+    ball.position.set(parseFloat(ballPosition[0]), 0.5, parseFloat(ballPosition[1]));
+
+    if (prevBallPosition) {
+      const speed = calculateSpeed(ballPosition, prevBallPosition);
+      const direction = calculateDirection(ballPosition, prevBallPosition);
+      ball.rotation.y = Math.atan2(direction.z, direction.x);
+      ball.rotation.z += speed * 50 * (frameInterval / 1000);
+    }
+    prevBallPosition = ballPosition;
+
+    if (isBallView) {
+      setCameraPosition(ball.position.clone().add(new THREE.Vector3(0, 20, 30)));
+    }
+  }
+}
+
+function calculateSpeed(currentPosition, previousPosition) {
+  if (!previousPosition) return 0;
+  const dx = currentPosition[0] - previousPosition[0];
+  const dz = currentPosition[1] - previousPosition[1];
+  return Math.sqrt(dx * dx + dz * dz);
+}
+
+function calculateDirection(currentPosition, previousPosition) {
+  if (!previousPosition) return new THREE.Vector3(0, 0, 1);
+  const dx = currentPosition[0] - previousPosition[0];
+  const dz = currentPosition[1] - previousPosition[1];
+  return new THREE.Vector3(dx, 0, dz).normalize();
+}
+
 init().catch(console.error);
+setupCameraControls();
 animate();
 
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
