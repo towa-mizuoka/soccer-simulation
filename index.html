@@ -45,7 +45,7 @@
         opacity: 0;
         visibility: hidden;
         transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
-        z-index: 1000; /* Ensure it appears above the canvas */
+        z-index: 500; /* Ensure it appears above the canvas */
       }
 
       #seek-bar-container.show {
@@ -83,7 +83,6 @@
         position: relative;
         bottom: 12px; /* スクロールバーが画面下部に配置されるように調整 */
         transform: translateX(-50%); /* 中央に配置するための調整 */
-        z-index: 1000; /* 他の要素と重ならないようにするための調整 */
       }
 
       #play-icon,
